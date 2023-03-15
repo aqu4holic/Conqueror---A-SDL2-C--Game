@@ -1,3 +1,5 @@
-# Repo for 2223II_INT2215_23 course
+# Conqueror - A-SDL2-C-Game
 
-- Created by Nguyen Thanh Phat
+## Introduction
+
+A game project made with SDL2 C++.
