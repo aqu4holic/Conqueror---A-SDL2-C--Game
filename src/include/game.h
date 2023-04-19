@@ -168,5 +168,5 @@ private:
 
 	int ray_hits_count;
 	int doors[MAP_WIDTH * MAP_HEIGHT];
-	vector <thin_wall*> thin_walls;
+	vector <wall*> walls;
 };

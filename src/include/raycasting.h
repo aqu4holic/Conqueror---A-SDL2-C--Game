@@ -8,8 +8,8 @@ using namespace std;
 #define THICK_WALL_TYPE_NONE 0
 #define THICK_WALL_TYPE_RECT 1
 
-// a thin_wall is made up of 2 points
-struct thin_wall{
+// a wall is made up of 2 points
+struct wall{
 	// start and end of line
 	double x1, y1, x2, y2;
 	double z;
@@ -19,42 +19,12 @@ struct thin_wall{
 
 	bool hidden;
 
-	struct thick_wall *Thick_wall;
+	// struct thick_wall *Thick_wall;
 
-	thin_wall();
-	thin_wall(double x1, double y1, double x2, double y2, int wall_type, thick_wall *Thick_wall, double wall_height);
+	wall();
+	wall(double x1, double y1, double x2, double y2, int wall_type, double wall_height);
 
 	double distance_to_origin(double ix, double iy);
-};
-
-/*
-	a thick_wall is an enclosed area of thin_wall
-	it can have a ceiling texture and a floor texture
-	it may also be sloped
-*/
-struct thick_wall{
-	thick_wall();
-
-	int type;
-
-	vector <thin_wall> thin_walls;
-
-	double x, y, w, h; // if type if thick_wall_type_rect
-	double height;
-
-	vector <point> points; // for thick_wall_type_triangle and quad
-	
-	int ceiling_texture_id;
-	int floor_texture_id;
-
-	double start_height, end_height;
-
-	void set_height(double height);
-	double get_height(){
-		return height;
-	}
-	void set_thin_walls_type(int wall_type);
-	bool contains_point(double x, double y);
 };
 
 // handle texture of walls, ceilings and floors
@@ -108,7 +78,7 @@ struct ray_hit{
 	sprite *Sprite; // a sprite was hit
 	bool right; // if ray angle is in right unit circle half
 	bool up; // if ray angle is in upper unit circle half
-	thin_wall *Thin_wall;
+	wall *Wall;
 	double wall_height;
 
 	/*
@@ -127,7 +97,7 @@ struct ray_hit{
 		horizontal = 0;
 		Sprite = 0;
 		sort_distance = 0;
-		Thin_wall = 0;
+		Wall = 0;
 		wall_height = 0;
 	}
 
@@ -209,10 +179,10 @@ struct raycaster{
 		return (is_horizontal_door(wall_type) || is_vertical_door(wall_type));
 	}
 
-	static void find_intersecting_thin_walls(vector <ray_hit> &ray_hits, vector <thin_wall*> &thin_walls,
+	static void find_intersecting_walls(vector <ray_hit> &ray_hits, vector <wall*> &walls,
 												double player_x, double player_y, double ray_end_x, double ray_end_y);
 	
-	void raycast_thin_walls(vector <ray_hit> &ray_hits, vector <thin_wall*> &thin_walls,
+	void raycast_walls(vector <ray_hit> &ray_hits, vector <wall*> &walls,
 							double player_x, double player_y, double player_rot,
 							double strip_angle, int strip_idx);
 

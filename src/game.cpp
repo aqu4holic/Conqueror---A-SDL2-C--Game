@@ -1129,7 +1129,7 @@ void game::raycast_world(vector <ray_hit> &ray_hits){
 		const double strip_angle = strip_angles[strip];
 
 		raycaster3d.raycast(ray_hits, player.x, player.y, player.rot, strip_angle, strip, 0);
-		raycaster3d.raycast_thin_walls(ray_hits, this -> thin_walls, player.x, player.y, player.rot, strip_angle, strip);
+		raycaster3d.raycast_walls(ray_hits, this -> walls, player.x, player.y, player.rot, strip_angle, strip);
 		raycaster3d.raycast_sprites(ray_hits, raycaster3d.grids, raycaster3d.grid_width, raycaster3d.grid_height, TILE_SIZE,
 									player.x, player.y, player.rot, strip_angle, strip, &sprites);
 	}

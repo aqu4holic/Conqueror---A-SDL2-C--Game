@@ -5,16 +5,15 @@ using namespace std;
 
 const double TWO_PI = 2 * M_PI;
 
-thin_wall::thin_wall(){
+wall::wall(){
 	x1 = y1 = x2 = y2 = 0;
 	wall_type = 0;
 	horizontal = 0;
 	height = 0;
 	hidden = 0;
-	Thick_wall = 0;
 }
 
-thin_wall::thin_wall(double x1, double y1, double x2, double y2, int wall_type, thick_wall *Thick_wall, double wall_height){
+wall::wall(double x1, double y1, double x2, double y2, int wall_type, double wall_height){
 	this -> x1 = x1;
 	this -> y1 = y1;
 	this -> x2 = x2;
@@ -24,49 +23,22 @@ thin_wall::thin_wall(double x1, double y1, double x2, double y2, int wall_type, 
 	height = 0;
 	z = 0;
 	hidden = 0;
-	this -> Thick_wall = Thick_wall;
 }
 
-double thin_wall::distance_to_origin(double ix, double iy){
+double wall::distance_to_origin(double ix, double iy){
 	return sqrt((x1 - ix) * (x1 - ix) + (y1 - iy) * (y1 - iy));
-}
-
-thick_wall::thick_wall(){
-	type = 0;
-	height = 0;
-	x = y = w = h = 0;
-	ceiling_texture_id = 0;
-	floor_texture_id = 0;
-}
-
-void thick_wall::set_height(double height){
-	this -> height = height;
-
-	for (int i = 0; i < (int) thin_walls.size(); ++i){
-		thin_walls[i].height = height;
-	}
-}
-
-void thick_wall::set_thin_walls_type(int wall_type){
-	for (int i = 0; i < (int) thin_walls.size(); ++i){
-		thin_walls[i].wall_type = wall_type;
-	}
-}
-
-bool thick_wall::contains_point(double x, double y){
-	return shape::point_in_rect(x, y, this -> x, this -> y, this -> w, this -> h);
 }
 
 bool ray_hit::same_ray_hit(const ray_hit &Ray_hit2){
 	const ray_hit &Ray_hit = *this;
 
 	return (Ray_hit.x == Ray_hit2.x && Ray_hit.y == Ray_hit2.y && Ray_hit.wall_type == Ray_hit2.wall_type
-			&& Ray_hit.strip == Ray_hit2.strip && Ray_hit.Thin_wall == Ray_hit2.Thin_wall && Ray_hit.ray_angle == Ray_hit2.ray_angle);
+			&& Ray_hit.strip == Ray_hit2.strip && Ray_hit.Wall == Ray_hit2.Wall && Ray_hit.ray_angle == Ray_hit2.ray_angle);
 }
 
 bool ray_hit_sorter::operator()(const ray_hit &a, const ray_hit &b) const{
-	// if either wall is a thin_wall, just use the distance of it
-	if (a.Thin_wall || b.Thin_wall){
+	// if either wall is a wall, just use the distance of it
+	if (a.Wall || b.Wall){
 		return (a.distance > b.distance);
 	}
 
@@ -454,14 +426,14 @@ void raycaster::raycast(vector <ray_hit> &ray_hits, vector <vector <int>> &grids
 	}
 }
 
-void raycaster::find_intersecting_thin_walls(vector <ray_hit> &ray_hits, vector <thin_wall*> &thin_walls,
+void raycaster::find_intersecting_walls(vector <ray_hit> &ray_hits, vector <wall*> &walls,
 											double player_x, double player_y, double ray_end_x, double ray_end_y){
-	for (int i = 0; i < (int) thin_walls.size(); ++i){
-		thin_wall &Thin_wall = *thin_walls[i];
+	for (int i = 0; i < (int) walls.size(); ++i){
+		wall &Wall = *walls[i];
 
 		double ix = 0, iy = 0;
 
-		bool hit_found = shape::lines_intersect(Thin_wall.x1, Thin_wall.y1, Thin_wall.x2, Thin_wall.y2,
+		bool hit_found = shape::lines_intersect(Wall.x1, Wall.y1, Wall.x2, Wall.y2,
 												player_x, player_y,
 												ray_end_x, ray_end_y,
 												&ix, &iy);
@@ -474,7 +446,7 @@ void raycaster::find_intersecting_thin_walls(vector <ray_hit> &ray_hits, vector 
 			Ray_hit.squared_distance = squared_distance;
 			Ray_hit.distance = sqrt(Ray_hit.squared_distance);
 			if (Ray_hit.distance){
-				Ray_hit.Thin_wall = &Thin_wall;
+				Ray_hit.Wall = &Wall;
 				Ray_hit.x = ix;
 				Ray_hit.y = iy;
 
@@ -484,7 +456,7 @@ void raycaster::find_intersecting_thin_walls(vector <ray_hit> &ray_hits, vector 
 	}
 }
 
-void raycaster::raycast_thin_walls(vector <ray_hit> &ray_hits, vector <thin_wall*> &thin_walls,
+void raycaster::raycast_walls(vector <ray_hit> &ray_hits, vector <wall*> &walls,
 								double player_x, double player_y, double player_rot,
 								double strip_angle, int strip_idx){
 	double ray_angle = strip_angle + player_rot;
@@ -501,19 +473,18 @@ void raycaster::raycast_thin_walls(vector <ray_hit> &ray_hits, vector <thin_wall
 	vector <ray_hit> new_ray_hits;
 	vector <ray_hit*> added_ray_hits;
 
-	find_intersecting_thin_walls(new_ray_hits, thin_walls, player_x, player_y, vx, vy);
+	find_intersecting_walls(new_ray_hits, walls, player_x, player_y, vx, vy);
 
 	for (int i = 0; i < (int) new_ray_hits.size(); ++i){
 		ray_hit &Ray_hit = new_ray_hits[i];
-		thin_wall *Thin_wall = Ray_hit.Thin_wall;
-		thick_wall *Thick_wall = Thin_wall -> Thick_wall;
+		wall *wall = Ray_hit.Wall;
 
-		Ray_hit.wall_height = Thin_wall -> height;
+		Ray_hit.wall_height = wall -> height;
 		Ray_hit.strip = strip_idx;
-		double dto = int(Thin_wall -> distance_to_origin(Ray_hit.x, Ray_hit.y) + 0.5);
+		double dto = int(wall -> distance_to_origin(Ray_hit.x, Ray_hit.y) + 0.5);
 		Ray_hit.tile_x = (int) dto % this -> tile_size;
-		Ray_hit.horizontal = Thin_wall -> horizontal;
-		Ray_hit.wall_type = Thin_wall -> wall_type;
+		Ray_hit.horizontal = wall -> horizontal;
+		Ray_hit.wall_type = wall -> wall_type;
 		Ray_hit.ray_angle = ray_angle;
 	
 		if (Ray_hit.distance){
