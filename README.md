@@ -21,7 +21,7 @@ Game's demo: https://youtu.be/oEzOYZ4L6Yg
 	- Open command line inside the cloned folder.
 	- Build `main.exe` wtih this command:
 	```
-	g++ -DBlackWhite -O2 -I src/include -L src/lib src/*.cpp -o test.exe -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf
+	g++ -DBlackWhite -O2 -I src/include -L src/lib src/*.cpp -o main.exe -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf
 	```
 
 ## Contents
