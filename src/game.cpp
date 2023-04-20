@@ -8,6 +8,7 @@ SDL_Surface *game::screen_surface = nullptr;
 
 const Uint8 *game::keyboard_state = SDL_GetKeyboardState(NULL);
 
+// append game map to a vector
 void array2d_to_vector(int a[MAP_HEIGHT][MAP_WIDTH], vector <int> &res){
 	res.clear();
 
@@ -18,10 +19,12 @@ void array2d_to_vector(int a[MAP_HEIGHT][MAP_WIDTH], vector <int> &res){
 	}
 }
 
+// for sprites erase
 bool needs_clean_up(const sprite &s){
 	return s.cleanup;
 }
 
+// determine which sprite can be killed
 bool is_killable_sprite(int texture_id){
 	return (3 <= texture_id && texture_id <= 8);
 }
@@ -29,6 +32,7 @@ bool is_killable_sprite(int texture_id){
 game::game() {}
 game::~game() {}
 
+// init SDL
 void game::init(){
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0){
 		printf("SDL Failed Initializing...");
@@ -71,6 +75,7 @@ void game::init(){
 	reset();
 }
 
+// set menu variables' value
 void game::menu_init(){
 	des_play.w = 160;
 	des_play.h = 100;
@@ -88,10 +93,12 @@ void game::menu_init(){
 	des_exit.y = des_help.y + des_help.h + (WINDOW_HEIGHT / 15);
 }
 
+// check if (x, y) is inside a button
 bool game::inside_button(int x, int y, SDL_Rect src){
 	return (src.x <= x && x <= src.x + src.w) && (src.y <= y && y <= src.y + src.h);
 }
 
+// update mouse event in menu
 int game::update_mouse(){
 	int mousex, mousey;
 
@@ -131,6 +138,7 @@ int game::update_mouse(){
 	return MENU;
 }
 
+// render guide menu
 void game::render_guide(){
 	Mix_HaltMusic();
 	SDL_SetWindowTitle(window, "Conqueror");
@@ -177,6 +185,7 @@ void game::render_guide(){
 	SDL_RenderPresent(renderer);
 }
 
+// render main menu
 void game::render_menu(){
 	Mix_HaltMusic();
 	SDL_SetWindowTitle(window, "Conqueror");
@@ -228,6 +237,7 @@ void game::render_menu(){
 	SDL_RenderPresent(renderer);
 }
 
+// cleanup game
 void game::clean(){
 	if (strip_angles){
 		delete[] strip_angles;
@@ -245,19 +255,20 @@ void game::clean(){
 	Mix_Quit();
 }
 
+// reset the game
 void game::reset(){
-	highest_ceiling_level = 1;
-
-	raycaster3d.create_grids(MAP_WIDTH, MAP_HEIGHT, highest_ceiling_level, TILE_SIZE);
+	raycaster3d.create_grids(MAP_WIDTH, MAP_HEIGHT, 1, TILE_SIZE);
 	array2d_to_vector(g_map1, raycaster3d.grids[0]);
 	array2d_to_vector(g_ceilingmap1, ceiling_grid);
 
+	// set player's variable
 	player.x = 2 * TILE_SIZE;
 	player.y = (MAP_HEIGHT - 2) * TILE_SIZE;
 	player.rot = M_PI / 2;
 	player.move_speed = TILE_SIZE / (DESIRED_FPS / 60.0 * 16.0);
-	player.rot_speed = 1.5 * M_PI / 180;
+	player.rot_speed = 1.0 * M_PI / 180;
 
+	// set up sprites
 	sprites.clear();
 	for (int i = 0; i < MAP_HEIGHT; ++i){
 		for (int j = 0; j < MAP_WIDTH; ++j){
@@ -272,6 +283,7 @@ void game::reset(){
 	}
 }
 
+// add sprite at cell
 void game::add_sprite_at(int sprite_id, int cell_x, int cell_y){
 	sprite s;
 	s.x = cell_x * TILE_SIZE + (TILE_SIZE / 2);
@@ -281,8 +293,8 @@ void game::add_sprite_at(int sprite_id, int cell_x, int cell_y){
 
 	int sprite_wall_x = int(s.x / TILE_SIZE);
 	int sprite_wall_y = int(s.y / TILE_SIZE);
-	bool in_wall = raycaster3d.safe_cell_at(sprite_wall_x, sprite_wall_y);
 
+	bool in_wall = raycaster3d.safe_cell_at(sprite_wall_x, sprite_wall_y);
 	if (in_wall){
 		return;
 	}
@@ -290,6 +302,7 @@ void game::add_sprite_at(int sprite_id, int cell_x, int cell_y){
 	sprites.push_back(s);
 }
 
+// at projectile at cell, with the direction
 void game::add_projectile(int texture_id, int x, int y, int size, double rotation){
 	sprite s;
 	s.x = x;
@@ -301,6 +314,7 @@ void game::add_projectile(int texture_id, int x, int y, int size, double rotatio
 	projectile_queue.push(s);
 }
 
+// start the game
 int game::start(){
 	strip_width = DEFAULT_STRIP_WIDTH;
 	ray_count = WINDOW_WIDTH / strip_width;
@@ -311,6 +325,7 @@ int game::start(){
 	// calculate the angles for each column strip once and save them
 	this -> strip_angles = new double [ray_count];
 	for (int strip = 0; strip < ray_count; ++strip){
+		// the origin is the player
 		double screen_x = (ray_count / 2 - strip) * strip_width;
 		strip_angles[strip] = raycaster::strip_angle(screen_x, view_dis);
 	}
@@ -388,6 +403,7 @@ int game::start(){
 		Surface_texture.create_texture(renderer);
 	}
 
+	// load floor and ceiling images
 	map <int, string> floor_ceiling_filenames;
 	floor_ceiling_filenames[0] = "grass.bmp";
 	floor_ceiling_filenames[1] = "texture1.bmp";
@@ -417,6 +433,7 @@ int game::start(){
 		return EXIT;
 	}
 
+	// load sound effect and bgm
 	projectile_fire_sound = Mix_LoadWAV("sfx/shooting.wav");
 	projectile_impact_sound = Mix_LoadWAV("sfx/explode.wav");
 	door_open_sound = Mix_LoadWAV("sfx/door_open.wav");
@@ -437,6 +454,7 @@ int game::start(){
 	return run();
 }
 
+// draw the game
 void game::draw(){
 	// clear screen
 	SDL_FillRect(screen_surface, NULL, 0);
@@ -454,6 +472,7 @@ void game::draw(){
 	SDL_UpdateTexture(screen_texture, NULL, screen_surface -> pixels, screen_surface -> pitch);
 	SDL_RenderCopy(renderer, screen_texture, NULL, NULL);
 
+	// draw the minimap
 	if (draw_minimap_on){
 		draw_minimap();
 		draw_rays(all_ray_hits);
@@ -464,16 +483,19 @@ void game::draw(){
 	SDL_RenderPresent(renderer);
 }
 
+// fill a rectangle on the screen
 void game::fill_rect(SDL_Rect *rc, int r, int g, int b){
 	SDL_SetRenderDrawColor(renderer, r, g, b, SDL_ALPHA_OPAQUE);
 	SDL_RenderFillRect(renderer, rc);
 }
 
+// draw a line with given coord on the screen
 void game::draw_line(int start_x, int start_y, int end_x, int end_y, int r, int g, int b, int alpha){
 	SDL_SetRenderDrawColor(renderer, r, g, b, alpha);
 	SDL_RenderDrawLine(renderer, start_x, start_y, end_x, end_y);
 }
 
+// draw gun and crosshair
 void game::draw_weapon(){
 	double gun_scale = WINDOW_WIDTH / 500;
 
@@ -495,6 +517,7 @@ void game::draw_weapon(){
 	SDL_BlitScaled(crosshair_surface, NULL, screen_surface, &des);
 }
 
+// draw the minimap
 void game::draw_minimap(){
 	SDL_Rect minimap_rect;
 	minimap_rect.x = 0;
@@ -532,6 +555,7 @@ void game::draw_minimap(){
 	}
 }
 
+// draw the player on the minimap
 void game::draw_player(){
 	SDL_Rect player_rect;
 
@@ -551,6 +575,7 @@ void game::draw_player(){
 	draw_line(player_x, player_y + MINIMAP_Y, line_end_x, line_end_y + MINIMAP_Y, 255, 0, 0);
 }
 
+// draw sprites on the minimap
 void game::draw_minimap_sprites(){
 	for (__typeof(sprites.begin()) it = sprites.begin(); it != sprites.end(); ++it){
 		sprite &s = *it;
@@ -573,6 +598,7 @@ void game::draw_minimap_sprites(){
 	}
 }
 
+// draw 1 ray on the minimap
 void game::draw_ray(double ray_x, double ray_y){
 	double player_x = (double) player.x / (MAP_WIDTH * TILE_SIZE) * 100;
 	player_x = player_x / 100 * MINIMAP_SCALE * MAP_WIDTH;
@@ -587,6 +613,7 @@ void game::draw_ray(double ray_x, double ray_y){
 	draw_line(player_x, player_y + MINIMAP_Y, ray_x, ray_y + MINIMAP_Y, 100, 0, 103, 0.3 * 255);
 }
 
+// draw rays of fov on the minimap
 void game::draw_rays(vector <ray_hit> &ray_hits){
 	for (int i = 0; i < (int) ray_hits.size(); ++i){
 		ray_hit &r = ray_hits[i];
@@ -597,6 +624,7 @@ void game::draw_rays(vector <ray_hit> &ray_hits){
 	}
 }
 
+// run the game
 int game::run(){
 	int past = SDL_GetTicks();
 	int now = past, past_fps = past;
@@ -661,6 +689,7 @@ int game::run(){
 	return MENU;
 }
 
+// update the game (basic player movement) after 1 game cycle
 void game::update(double time_elapsed){
 	// move forward
 	if (keyboard_state[SDL_SCANCODE_W]){
@@ -692,6 +721,7 @@ void game::update(double time_elapsed){
 	update_projectiles(time_elapsed);
 }
 
+// update player after 1 game cycle
 void game::update_player(double time_elapsed){
 	double time_based_factor = time_elapsed / UPDATE_INTERVAL;
 	double move_step = player.speed * player.move_speed * time_based_factor;
@@ -735,17 +765,20 @@ void game::update_player(double time_elapsed){
 	}
 }
 
+// update the projectile after 1 game cycle
 void game::update_projectiles(double time_elapsed){
 	sprites.erase(remove_if(sprites.begin(), sprites.end(), needs_clean_up), sprites.end());
 
 	double time_based_factor = time_elapsed / UPDATE_INTERVAL;
-	double projectile_speed = 3 * player.move_speed * time_based_factor;
-	double move_step = 1 * projectile_speed; // only move forward;
+	double projectile_speed = 3 * player.move_speed * time_based_factor; // faster than player speed
+	double move_step = 1 * projectile_speed; // only move forward
 
+	// process all the projectile in the queue
 	while(projectile_queue.size()){
 		sprite new_projectile = projectile_queue.front();
 		projectile_queue.pop();
 
+		// if projectile hasn't explode
 		if (new_projectile.texture_id != SPRITE_TYPE_PROJECTILE_SPLASH){
 			double new_x = new_projectile.x + cos(new_projectile.rot) * player.move_speed;
 			double new_y = new_projectile.y - sin(new_projectile.rot) * player.move_speed;
@@ -753,8 +786,10 @@ void game::update_projectiles(double time_elapsed){
 			new_projectile.x = new_x;
 			new_projectile.y = new_y;
 		}
+		// projectile exploded
 		else{
 			new_projectile.frame = 0;
+			// how long the explosion lasts
 			new_projectile.frame_rate = 200;
 		}
 
@@ -764,28 +799,31 @@ void game::update_projectiles(double time_elapsed){
 	for (__typeof(sprites.begin()) it = sprites.begin(); it != sprites.end(); ++it){
 		sprite &projectile = *it;
 
+		// update the explosion
 		if (projectile.texture_id == SPRITE_TYPE_PROJECTILE_SPLASH){
 			projectile.frame_rate -= time_elapsed;
 
 			if (projectile.frame_rate <= 0){
-				projectile.cleanup = projectile.cleanup = 1;
+				projectile.cleanup = projectile.hidden = 1;
 			}
 
 			continue;
 		}
 
+		// kill the sprite that got hit
 		if (is_killable_sprite(projectile.texture_id)){
 			if (projectile.frame_rate){
 				projectile.frame_rate -= time_elapsed;
 
 				if (projectile.frame_rate <= 0){
-					projectile.cleanup = projectile.cleanup = 1;
+					projectile.cleanup = projectile.hidden = 1;
 				}
 
 				continue;
 			}
 		}
 
+		// only process the projectile 
 		if (projectile.texture_id != SPRITE_TYPE_PROJECTILE){
 			continue;
 		}
@@ -799,12 +837,14 @@ void game::update_projectiles(double time_elapsed){
 		bool out_of_bounds = 0;
 		bool hit_other_sprites = 0;
 
+		// if hit wall cell
 		if (is_wall_cell(wall_x, wall_y)){
 			new_x = projectile.x + cos(projectile.rot) * move_step / 4;
 			new_y = projectile.y - sin(projectile.rot) * move_step / 4;
 			wall_x = new_x / TILE_SIZE;
 			wall_y = new_y / TILE_SIZE;
 
+			// move the projectile a little bit
 			if (is_wall_cell(wall_x, wall_y)){
 				if (!projectile.cleanup){
 					add_projectile(SPRITE_TYPE_PROJECTILE_SPLASH, projectile.x, projectile.y, TILE_SIZE, projectile.rot);
@@ -818,6 +858,7 @@ void game::update_projectiles(double time_elapsed){
 			}
 		}
 
+		// out of bound
 		if (new_x < 0 || new_x > MAP_WIDTH * TILE_SIZE || new_y < 0 || new_y > MAP_HEIGHT * TILE_SIZE){
 			out_of_bounds = 1;
 			projectile.cleanup = 1;
@@ -829,6 +870,7 @@ void game::update_projectiles(double time_elapsed){
 			for (__typeof(sprites_hit.begin()) it2 = sprites_hit.begin(); it2 != sprites_hit.end(); ++it2){
 				sprite *s = *it2;
 
+				// hit a sprite, add an explosion
 				if (is_killable_sprite(s -> texture_id) && !s -> hidden){
 					if (s -> frame_rate == 0){
 						s -> frame_rate = 200;
@@ -849,6 +891,7 @@ void game::update_projectiles(double time_elapsed){
 			}
 		}
 
+		// update the projectile pos
 		if (!wall_hit && !out_of_bounds && !hit_other_sprites){
 			projectile.x = new_x;
 			projectile.y = new_y;
@@ -856,6 +899,7 @@ void game::update_projectiles(double time_elapsed){
 	}
 }
 
+// draw the floor in 3d (psuedo)
 void game::draw_floor(vector <ray_hit> &ray_hits){
 	Uint32 *screen_pixels = (Uint32*) screen_surface -> pixels;
 	for (int i = 0; i < (int) ray_hits.size(); ++i){
@@ -923,6 +967,7 @@ void game::draw_floor(vector <ray_hit> &ray_hits){
 	}
 }
 
+// draw the ceiling in 3d (psuedo)
 void game::draw_ceiling(vector <ray_hit> &ray_hits){
 	Uint32 *screen_pixels = (Uint32*) screen_surface -> pixels;
 	for (int i = 0; i < (int) ray_hits.size(); ++i){
@@ -983,14 +1028,16 @@ void game::draw_ceiling(vector <ray_hit> &ray_hits){
 	}
 }
 
+// draw the world in 3d (psuedo)
 void game::draw_world(vector <ray_hit> &ray_hits){
+	// sort all the rays because we need to draw the furthest ray first
 	ray_hit_sorter Ray_hit_sorter(&raycaster3d, TILE_SIZE / 2);
 	sort(ray_hits.begin(), ray_hits.end(), Ray_hit_sorter);
 
 	draw_ceiling(ray_hits);
 	draw_floor(ray_hits);
 
-	// erase all sprites that need cleanup
+	// erase all sprites that need cleanup to free up memory in case player's spamming
 	sprites.erase(remove_if(sprites.begin(), sprites.end(), needs_clean_up), sprites.end());
 
 	// draw walls and sprite
@@ -999,6 +1046,7 @@ void game::draw_world(vector <ray_hit> &ray_hits){
 
 		// wall
 		if (r.wall_type){
+			// calculate the height of that ray
 			int wall_screen_height = raycaster::strip_screen_height(view_dis, r.correct_distance, TILE_SIZE);
 			double sx = r.tile_x / TILE_SIZE * TEXTURE_SIZE;
 			if (sx >= TEXTURE_SIZE){
@@ -1006,16 +1054,20 @@ void game::draw_world(vector <ray_hit> &ray_hits){
 			}
 			double sy = TEXTURE_SIZE * (r.wall_type - 1);
 
+			// if the wall is horizontal, the wall will be darker to distinct from the vertical wall (horizontal and vertical in 2d)
 			surface_texture *img = (r.horizontal ? &walls_image_dark : &walls_image);
 
+			// if wall is open
 			bool wall_is_door = raycaster::is_door(r.wall_type);
 			if (wall_is_door){
 				sy = 0;
 				img = (doors[r.wall_x + r.wall_y * MAP_WIDTH] ? &gates_open_image : &gates_image);
 			}
 
+			// draw the wall on the screen
 			draw_wall_strip(r, *img, sx, sy, wall_screen_height);
 		}
+		// sprite
 		else if (r.Sprite && !r.Sprite -> hidden){
 			SDL_Rect des_rect;
 			surface_texture *sprite_st = nullptr;
@@ -1030,20 +1082,7 @@ void game::draw_world(vector <ray_hit> &ray_hits){
 	}
 }
 
-double game::wall_screen_y(ray_hit &Ray_hit, double wall_height){
-	// height of 1 tile
-	double default_wall_screen_height = raycaster::strip_screen_height(view_dis, Ray_hit.correct_distance, TILE_SIZE);
-	// height of the wall
-	double wall_screen_height = raycaster::strip_screen_height(view_dis, Ray_hit.correct_distance, wall_height);
-	double y = (WINDOW_HEIGHT - default_wall_screen_height) / 2;
-
-	if (wall_height != TILE_SIZE){
-		y += (default_wall_screen_height - wall_screen_height);
-	}
-
-	return y;
-}
-
+// calculate the srip's rectangle
 SDL_Rect game::strip_screen_rect(ray_hit &Ray_hit, double wall_height){
 	// height of 1 tile
 	double default_wall_screen_height = raycaster::strip_screen_height(view_dis, Ray_hit.correct_distance, TILE_SIZE);
@@ -1069,6 +1108,7 @@ SDL_Rect game::strip_screen_rect(ray_hit &Ray_hit, double wall_height){
 	return rc;
 }
 
+// draw a wall strip on the screen
 void game::draw_wall_strip(ray_hit &Ray_hit, surface_texture &img, double tex_x, double tex_y, int wall_screen_height){
 	/*
 		clamp wall screen height
@@ -1081,7 +1121,7 @@ void game::draw_wall_strip(ray_hit &Ray_hit, surface_texture &img, double tex_x,
 	SDL_Rect src_rect, des_rect;
 	src_rect.x = tex_x;
 	src_rect.y = tex_y;
-	src_rect.w = 1;
+	src_rect.w = strip_width;
 	src_rect.h = TEXTURE_SIZE;
 
 	des_rect.x = Ray_hit.strip * strip_width;
@@ -1128,8 +1168,7 @@ void game::raycast_world(vector <ray_hit> &ray_hits){
 	for (int strip = 0; strip < ray_count; ++strip){
 		const double strip_angle = strip_angles[strip];
 
-		raycaster3d.raycast(ray_hits, player.x, player.y, player.rot, strip_angle, strip, 0);
-		raycaster3d.raycast_walls(ray_hits, this -> walls, player.x, player.y, player.rot, strip_angle, strip);
+		raycaster3d.raycast(ray_hits, player.x, player.y, player.rot, strip_angle, strip);
 		raycaster3d.raycast_sprites(ray_hits, raycaster3d.grids, raycaster3d.grid_width, raycaster3d.grid_height, TILE_SIZE,
 									player.x, player.y, player.rot, strip_angle, strip, &sprites);
 	}
@@ -1195,6 +1234,10 @@ bool game::player_in_wall(double player_x, double player_y){
 void game::on_key_up(SDL_Event *event){
 	int sym = event -> key.keysym.sym;
 	switch(sym){
+		case SDLK_r: {
+			reset();
+			break;
+		}
 		case SDLK_0: {
 			printf("%d %d\n", (int) player.x / TILE_SIZE, (int) player.y / TILE_SIZE);
 			break;

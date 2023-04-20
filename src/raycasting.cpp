@@ -10,7 +10,6 @@ wall::wall(){
 	wall_type = 0;
 	horizontal = 0;
 	height = 0;
-	hidden = 0;
 }
 
 wall::wall(double x1, double y1, double x2, double y2, int wall_type, double wall_height){
@@ -22,20 +21,14 @@ wall::wall(double x1, double y1, double x2, double y2, int wall_type, double wal
 	horizontal = 0;
 	height = 0;
 	z = 0;
-	hidden = 0;
 }
 
+// distance to the origin of the wall
 double wall::distance_to_origin(double ix, double iy){
 	return sqrt((x1 - ix) * (x1 - ix) + (y1 - iy) * (y1 - iy));
 }
 
-bool ray_hit::same_ray_hit(const ray_hit &Ray_hit2){
-	const ray_hit &Ray_hit = *this;
-
-	return (Ray_hit.x == Ray_hit2.x && Ray_hit.y == Ray_hit2.y && Ray_hit.wall_type == Ray_hit2.wall_type
-			&& Ray_hit.strip == Ray_hit2.strip && Ray_hit.Wall == Ray_hit2.Wall && Ray_hit.ray_angle == Ray_hit2.ray_angle);
-}
-
+// operator to sort rays based on the distance of it
 bool ray_hit_sorter::operator()(const ray_hit &a, const ray_hit &b) const{
 	// if either wall is a wall, just use the distance of it
 	if (a.Wall || b.Wall){
@@ -46,18 +39,14 @@ bool ray_hit_sorter::operator()(const ray_hit &a, const ray_hit &b) const{
 		sort by distance between player's eye to the wall below
 		furthest wall drawn first
 	*/
-	double v_distance_to_eye_a = eye;
-	double v_distance_to_eye_b = eye;
 
 	double dis_a = (a.sort_distance ? a.sort_distance : a.distance);
 	double dis_b = (b.sort_distance ? b.sort_distance : b.distance);
 
-	double distance_to_wall_base_a = v_distance_to_eye_a * v_distance_to_eye_a + dis_a * dis_a;
-	double distance_to_wall_base_b = v_distance_to_eye_b * v_distance_to_eye_b + dis_b * dis_b;
-
-	return distance_to_wall_base_a > distance_to_wall_base_b;
+	return dis_a > dis_b;
 }
 
+// create map
 void raycaster::create_grids(int grid_width, int grid_height, int grid_count, int tile_size){
 	this -> grid_width = grid_width;
 	this -> grid_height = grid_height;
@@ -83,11 +72,13 @@ double raycaster::strip_angle(double screen_x, double screen_distance){
 	return atan(screen_x / screen_distance);
 }
 
+// calculate the height of a strip in screen height
 double raycaster::strip_screen_height(double screen_distance, double correct_distance, double tile_size){
 	// use +0.5 to round
 	return int(screen_distance / correct_distance * tile_size + 0.5);
 }
 
+// check in ray_his if it contains a wall
 bool raycaster::is_wall_in_ray_hits(vector <ray_hit> &ray_hits, int cell_x, int cell_y){
 	for (__typeof(ray_hits.begin()) it = ray_hits.begin(); it != ray_hits.end(); ++it){
 		if ((*it).wall_type && (*it).wall_x == cell_x && (*it).wall_y == cell_y){
@@ -98,6 +89,7 @@ bool raycaster::is_wall_in_ray_hits(vector <ray_hit> &ray_hits, int cell_x, int 
 	return 0;
 }
 
+// find sprites in current cell...
 vector <sprite*> raycaster::find_sprites_in_cell(vector <sprite> &sprites, int cell_x, int cell_y, int tile_size){
 	vector <sprite*> sprites_found = {};
 
@@ -112,31 +104,28 @@ vector <sprite*> raycaster::find_sprites_in_cell(vector <sprite> &sprites, int c
 	return sprites_found;
 }
 
-bool raycaster::needs_next_wall(vector <vector <int>> &grids, int tile_size, int grid_width, int x, int y){
+// 
+bool raycaster::needs_next_wall(vector <vector <int>> &grids, int grid_width, int x, int y){
 	vector <int> &grid = grids[0];
-	if (x && y){
-		if (is_door(grid[x + y * grid_width])){
-			return 1;
-		}
+
+	if (is_door(grid[x + y * grid_width])){
+		return 1;
 	}
 
 	return 0;
 }
 
 void raycaster::raycast(vector <ray_hit> &ray_hits, int player_x, int player_y,
-						double player_rot, double strip_angle, int strip_idx,
-						vector <sprite> *sprites_to_look_for){
+						double player_rot, double strip_angle, int strip_idx){
 	raycaster::raycast(ray_hits, this -> grids, this -> grid_width, this -> grid_height, this -> tile_size,
 						player_x, player_y, player_rot,
-						strip_angle, strip_idx,
-						sprites_to_look_for);
+						strip_angle, strip_idx);
 }
 
 void raycaster::raycast(vector <ray_hit> &ray_hits, vector <vector <int>> &grids, int grid_width, int grid_height, int tile_size,
 						int player_x, int player_y,
 						double player_rot, double strip_angle,
-						int strip_idx,
-						vector <sprite> *sprites_to_look_for){
+						int strip_idx){
 	if (!grids.size()){
 		return;
 	}
@@ -150,279 +139,189 @@ void raycaster::raycast(vector <ray_hit> &ray_hits, vector <vector <int>> &grids
 				(ray_angle > 0.75 * TWO_PI); // quad 4
 	bool up = (ray_angle < TWO_PI * 0.5 && ray_angle >= 0); // quad 1 and 2
 
-	vector <int> &ground_grid = grids[0];
+	vector <int> &grid = grids[0];
 
-	int current_tile_x = player_x / tile_size;
-	int current_tile_y = player_y / tile_size;
+	// vertical lines check
+	double vertical_line_distance = 0;
+	ray_hit verical_wall_hit;
 
-	for (int level = 0; level < (int) grids.size(); ++level){
-		vector <int> &grid = grids[level];
-		
-		// check player's current tile for sprites
-		vector <sprite*> sprites_hit;
-		if (sprites_to_look_for){
-			vector <sprite*> sprites_found = find_sprites_in_cell(*sprites_to_look_for, current_tile_x, current_tile_y, tile_size);
+	// find x coord of vertical lines on the right and the left
+	double vx = int(player_x / tile_size) * tile_size + (right ? tile_size : -1);
+	// find y coord of those lines
+	// line_y = player_y + (player_x - line_x) * tan(alpha)
+	double vy = player_y + (player_x - vx) * tan(ray_angle);
 
-			for (int i = 0; i < (int) sprites_found.size(); ++i){
-				sprite *s = sprites_found[i];
+	// calculate stepping vector for each line
+	double step_x = (right ? tile_size : -tile_size);
+	double step_y = tile_size * tan(ray_angle) * (right ? -1.0 : 1.0);
 
-				if (!s -> Ray_hit){
-					const double dis_x = player_x - s -> x;
-					const double dis_y = player_y - s -> y;
-					const double block_dis = dis_x * dis_x + dis_y * dis_y;
+	bool prev_gaps = 0;
+	while(vx >= 0 && vx < grid_width * tile_size && vy >= 0 && vy < grid_height * tile_size){
+		int wall_x = int(vx / tile_size);
+		int wall_y = int(vy / tile_size);
+		int wall_offset = wall_x + wall_y * grid_width;
 
-					if (block_dis){
-						s -> Ray_hit = 1;
-						s -> distance = sqrt(block_dis);
+		// check if current cell is a wall
+		if (grid[wall_offset] && !is_horizontal_door(grid[wall_offset])){
+			double dis_x = player_x - vx;
+			double dis_y = player_y - vy;
+			double block_dis = dis_x * dis_x + dis_y * dis_y;
 
-						sprites_hit.push_back(s);
-					}
-				}
-			}
-		}
+			if (block_dis){
+				double tex_x = fmod(vy, tile_size);
+				tex_x = (right ? tex_x : tile_size - tex_x); // if facing left, flip image
 
-		// vertical lines check
-		double vertical_line_distance = 0;
-		ray_hit verical_wall_hit;
+				ray_hit Ray_hit(vx, vy, ray_angle);
+				Ray_hit.strip = strip_idx;
+				Ray_hit.wall_type = grid[wall_offset];
+				Ray_hit.wall_x = wall_x;
+				Ray_hit.wall_y = wall_y;
+				Ray_hit.right = right;
+				Ray_hit.up = up;
+				Ray_hit.distance = sqrt(block_dis);
+				Ray_hit.sort_distance = Ray_hit.distance;
+				
+				bool can_add = 1;
+				// if a door, render half of rays inside
+				if (is_vertical_door(grid[wall_offset])){
+					int new_wall_x = int((vx + step_x / 2) / tile_size);
+					int new_wall_y = int((vy + step_y / 2) / tile_size);
 
-		// find x coord of vertical lines on the right and the left
-		double vx = int(player_x / tile_size) * tile_size + (right ? tile_size : -1);
-		// find y coord of those lines
-		// line_y = player_y + (player_x - line_x) * tan(alpha)
-		double vy = player_y + (player_x - vx) * tan(ray_angle);
+					if (new_wall_x == wall_x && new_wall_y == wall_y){
+						double half_distance_squared = (step_x / 2) * (step_x / 2) + (step_y / 2) * (step_y / 2);
+						double half_distance = sqrt(half_distance_squared);
+						Ray_hit.distance += half_distance;
+						tex_x = fmod(vy + step_y / 2, tile_size);
 
-		// calculate stepping vector for each line
-		double step_x = (right ? tile_size : -tile_size);
-		double step_y = tile_size * tan(ray_angle) * (right ? -1.0 : 1.0);
-
-		bool prev_gaps = 0;
-		while(vx >= 0 && vx < grid_width * tile_size && vy >= 0 && vy < grid_height * tile_size){
-			int wall_x = int(vx / tile_size);
-			int wall_y = int(vy / tile_size);
-			int wall_offset = wall_x + wall_y * grid_width;
-
-			// look for sprites in current cell
-			if (sprites_to_look_for){
-				vector <sprite*> sprites_found = find_sprites_in_cell(*sprites_to_look_for, wall_x, wall_y, tile_size);
-
-				for (int i = 0; i < (int) sprites_found.size(); ++i){
-					sprite *s = sprites_found[i];
-
-					if (!s -> Ray_hit){
-						const double dis_x = player_x - s -> x;
-						const double dis_y = player_y - s -> y;
-						const double block_dis = dis_x * dis_x + dis_y * dis_y;
-						s -> distance = sqrt(block_dis);
-						sprites_hit.push_back(s);
-
-						ray_hit sprite_ray_hit(vx, vy, ray_angle);
-						sprite_ray_hit.strip = strip_idx;
-						if (s -> distance){
-							sprite_ray_hit.distance = s -> distance;
-							sprite_ray_hit.correct_distance = sprite_ray_hit.distance * cos(strip_angle);
-						}
-						sprite_ray_hit.wall_type = 0;
-						sprite_ray_hit.Sprite = s;
-						sprite_ray_hit.distance = s -> distance;
-						s -> Ray_hit = 1;
-
-						ray_hits.push_back(sprite_ray_hit);
-					}
-				}
-			}
-
-			// check if current cell is a wall
-			if (grid[wall_offset] && !is_horizontal_door(grid[wall_offset])){
-				double dis_x = player_x - vx;
-				double dis_y = player_y - vy;
-				double block_dis = dis_x * dis_x + dis_y * dis_y;
-
-				if (block_dis){
-					double tex_x = fmod(vy, tile_size);
-					tex_x = (right ? tex_x : tile_size - tex_x); // if facing left, flip image
-
-					ray_hit Ray_hit(vx, vy, ray_angle);
-					Ray_hit.strip = strip_idx;
-					Ray_hit.wall_type = grid[wall_offset];
-					Ray_hit.wall_x = wall_x;
-					Ray_hit.wall_y = wall_y;
-					Ray_hit.right = right;
-					Ray_hit.up = up;
-					Ray_hit.distance = sqrt(block_dis);
-					Ray_hit.sort_distance = Ray_hit.distance;
-					
-					bool can_add = 1;
-					// if a door, render half of rays inside
-					if (is_vertical_door(grid[wall_offset])){
-						int new_wall_x = int((vx + step_x / 2) / tile_size);
-						int new_wall_y = int((vy + step_y / 2) / tile_size);
-
-						if (new_wall_x == wall_x && new_wall_y == wall_y){
-							double half_distance_squared = (step_x / 2) * (step_x / 2) + (step_y / 2) * (step_y / 2);
-							double half_distance = sqrt(half_distance_squared);
-							Ray_hit.distance += half_distance;
-							tex_x = fmod(vy + step_y / 2, tile_size);
-
-							// give doors lower drawing priority to prevent the wall above drawing its bottom surface later than the door
-							Ray_hit.sort_distance -= 1;
-						}
-						else{
-							can_add = 0;
-						}
-					}
-					Ray_hit.correct_distance = Ray_hit.distance * cos(strip_angle);
-					Ray_hit.horizontal = 0;
-					Ray_hit.tile_x = tex_x;
-
-					bool gaps = needs_next_wall(grids, tile_size, grid_width, wall_x, wall_y);
-					// there is an empty space before this wall
-					if (gaps){
-						prev_gaps = gaps; // for next wall check
+						// give doors lower drawing priority to prevent the wall above drawing its bottom surface later than the door
+						Ray_hit.sort_distance -= 1;
 					}
 					else{
-						verical_wall_hit = Ray_hit;
-						vertical_line_distance = block_dis;
-
-						break;
-					}
-
-					if (can_add){
-						ray_hits.push_back(Ray_hit);
+						can_add = 0;
 					}
 				}
-			}
+				Ray_hit.correct_distance = Ray_hit.distance * cos(strip_angle);
+				Ray_hit.horizontal = 0;
+				Ray_hit.tile_x = tex_x;
 
-			vx += step_x;
-			vy += step_y;
+				bool gaps = needs_next_wall(grids, grid_width, wall_x, wall_y);
+				// there is an empty space before this wall
+				if (gaps){
+					prev_gaps = gaps; // for next wall check
+				}
+				else{
+					verical_wall_hit = Ray_hit;
+					vertical_line_distance = block_dis;
+
+					break;
+				}
+
+				if (can_add){
+					ray_hits.push_back(Ray_hit);
+				}
+			}
 		}
 
-		// horizontal lines check
-		double horizontal_line_distance = 0;
-		// find y coord of horizontal lines on the left and right
-		double hy = int(player_y / tile_size) * tile_size + (up ? -1 : tile_size);
-		// calculate x coord of horizontal line
-		// line_x = player_x + (player_y - line_y) / tan(alpha)
-		double hx = player_x + (player_y - hy) / tan(ray_angle);
-		step_x = tile_size / tan(ray_angle) * (up ? 1 : -1);
-		step_y = (up ? -tile_size : tile_size);
+		vx += step_x;
+		vy += step_y;
+	}
 
-		prev_gaps = 0;
-		while(hx >= 0 && hx < grid_width * tile_size && hy >= 0 && hy < grid_height * tile_size){
-			int wall_x = int(hx / tile_size);
-			int wall_y = int(hy / tile_size);
-			int wall_offset = wall_x + wall_y * grid_width;
+	// horizontal lines check
+	double horizontal_line_distance = 0;
+	// find y coord of horizontal lines on the left and right
+	double hy = int(player_y / tile_size) * tile_size + (up ? -1 : tile_size);
+	// calculate x coord of horizontal line
+	// line_x = player_x + (player_y - line_y) / tan(alpha)
+	double hx = player_x + (player_y - hy) / tan(ray_angle);
+	step_x = tile_size / tan(ray_angle) * (up ? 1 : -1);
+	step_y = (up ? -tile_size : tile_size);
 
-			// look for sprites in current cell
-			if (sprites_to_look_for){
-				vector <sprite*> sprites_found = find_sprites_in_cell(*sprites_to_look_for, wall_x, wall_y, tile_size);
+	prev_gaps = 0;
+	while(hx >= 0 && hx < grid_width * tile_size && hy >= 0 && hy < grid_height * tile_size){
+		int wall_x = int(hx / tile_size);
+		int wall_y = int(hy / tile_size);
+		int wall_offset = wall_x + wall_y * grid_width;
 
-				for (int i = 0; i < (int) sprites_found.size(); ++i){
-					sprite *s = sprites_found[i];
+		// check if current cell is a wall
+		if (grid[wall_offset] && !is_vertical_door(grid[wall_offset])){
+			double dis_x = player_x - hx;
+			double dis_y = player_y - hy;
+			double block_dis = dis_x * dis_x + dis_y * dis_y;
 
-					if (!s -> Ray_hit){
-						const double dis_x = player_x - s -> x;
-						const double dis_y = player_y - s -> y;
-						const double block_dis = dis_x * dis_x + dis_y * dis_y;
-						s -> distance = sqrt(block_dis);
-						sprites_hit.push_back(s);
-
-						ray_hit sprite_ray_hit(vx, vy, ray_angle);
-						sprite_ray_hit.strip = strip_idx;
-						if (s -> distance){
-							sprite_ray_hit.distance = s -> distance;
-							sprite_ray_hit.correct_distance = sprite_ray_hit.distance * cos(strip_angle);
-						}
-						sprite_ray_hit.wall_type = 0;
-						sprite_ray_hit.Sprite = s;
-						sprite_ray_hit.distance = s -> distance;
-						s -> Ray_hit = 1;
-
-						ray_hits.push_back(sprite_ray_hit);
-					}
+			// if vertical distance is less than horizontal line distance, stop
+			if (vertical_line_distance > 0 && vertical_line_distance < block_dis){
+				// unless there was some space below previous wall
+				if (!prev_gaps){
+					break;
 				}
 			}
 
-			// check if current cell is a wall
-			if (grid[wall_offset] && !is_vertical_door(grid[wall_offset])){
-				double dis_x = player_x - hx;
-				double dis_y = player_y - hy;
-				double block_dis = dis_x * dis_x + dis_y * dis_y;
+			if (block_dis){
+				double tex_x = fmod(hx, tile_size);
+				tex_x = (up ? tex_x : tile_size - tex_x); // if facing left, flip image
 
-				// if vertical distance is less than horizontal line distance, stop
-				if (vertical_line_distance > 0 && vertical_line_distance < block_dis){
-					// unless there was some space below previous wall
-					if (!prev_gaps){
-						break;
-					}
-				}
+				ray_hit Ray_hit(hx, hy, ray_angle);
+				Ray_hit.strip = strip_idx;
+				Ray_hit.wall_type = grid[wall_offset];
+				Ray_hit.wall_x = wall_x;
+				Ray_hit.wall_y = wall_y;
+				Ray_hit.right = right;
+				Ray_hit.up = up;
+				Ray_hit.distance = sqrt(block_dis);
+				Ray_hit.sort_distance = Ray_hit.distance;
+				
+				bool can_add = 1;
+				// if a door, render half of rays inside
+				if (is_horizontal_door(grid[wall_offset])){
+					int new_wall_x = int((hx + step_x / 2) / tile_size);
+					int new_wall_y = int((hy + step_y / 2) / tile_size);
 
-				if (block_dis){
-					double tex_x = fmod(hx, tile_size);
-					tex_x = (up ? tex_x : tile_size - tex_x); // if facing left, flip image
+					if (new_wall_x == wall_x && new_wall_y == wall_y){
+						double half_distance_squared = (step_x / 2) * (step_x / 2) + (step_y / 2) * (step_y / 2);
+						double half_distance = sqrt(half_distance_squared);
+						Ray_hit.distance += half_distance;
+						tex_x = fmod(hx + step_x / 2, tile_size);
 
-					ray_hit Ray_hit(hx, hy, ray_angle);
-					Ray_hit.strip = strip_idx;
-					Ray_hit.wall_type = grid[wall_offset];
-					Ray_hit.wall_x = wall_x;
-					Ray_hit.wall_y = wall_y;
-					Ray_hit.right = right;
-					Ray_hit.up = up;
-					Ray_hit.distance = sqrt(block_dis);
-					Ray_hit.sort_distance = Ray_hit.distance;
-					
-					bool can_add = 1;
-					// if a door, render half of rays inside
-					if (is_horizontal_door(grid[wall_offset])){
-						int new_wall_x = int((hx + step_x / 2) / tile_size);
-						int new_wall_y = int((hy + step_y / 2) / tile_size);
-
-						if (new_wall_x == wall_x && new_wall_y == wall_y){
-							double half_distance_squared = (step_x / 2) * (step_x / 2) + (step_y / 2) * (step_y / 2);
-							double half_distance = sqrt(half_distance_squared);
-							Ray_hit.distance += half_distance;
-							tex_x = fmod(hx + step_x / 2, tile_size);
-
-							// give doors lower drawing priority to prevent the wall above drawing its bottom surface later than the door
-							Ray_hit.sort_distance -= 1;
-						}
-						else{
-							can_add = 0;
-						}
-					}
-					Ray_hit.correct_distance = Ray_hit.distance * cos(strip_angle);
-					Ray_hit.horizontal = 1;
-					Ray_hit.tile_x = tex_x;
-					horizontal_line_distance = block_dis;
-
-					if (can_add){
-						ray_hits.push_back(Ray_hit);
-					}
-
-					bool gaps = needs_next_wall(grids, tile_size, grid_width, wall_x, wall_y);
-					// there is an empty space before this wall
-					if (gaps){
-						// add the previous vertical line if exists
-						if (vertical_line_distance){
-							ray_hits.push_back(verical_wall_hit);
-
-							vertical_line_distance = 0;
-						}
-						prev_gaps = gaps; // for next wall check
+						// give doors lower drawing priority to prevent the wall above drawing its bottom surface later than the door
+						Ray_hit.sort_distance -= 1;
 					}
 					else{
-						break;
+						can_add = 0;
 					}
 				}
+				Ray_hit.correct_distance = Ray_hit.distance * cos(strip_angle);
+				Ray_hit.horizontal = 1;
+				Ray_hit.tile_x = tex_x;
+				horizontal_line_distance = block_dis;
+
+				if (can_add){
+					ray_hits.push_back(Ray_hit);
+				}
+
+				bool gaps = needs_next_wall(grids, grid_width, wall_x, wall_y);
+				// there is an empty space before this wall
+				if (gaps){
+					// add the previous vertical line if exists
+					if (vertical_line_distance){
+						ray_hits.push_back(verical_wall_hit);
+
+						vertical_line_distance = 0;
+					}
+					prev_gaps = gaps; // for next wall check
+				}
+				else{
+					break;
+				}
 			}
-
-			hx += step_x;
-			hy += step_y;
 		}
 
-		// if no horizontal line was found but a vertical line was
-		if (!horizontal_line_distance && vertical_line_distance){
-			ray_hits.push_back(verical_wall_hit);
-		}
+		hx += step_x;
+		hy += step_y;
+	}
+
+	// if no horizontal line was found but a vertical line was
+	if (!horizontal_line_distance && vertical_line_distance){
+		ray_hits.push_back(verical_wall_hit);
 	}
 }
 
@@ -456,53 +355,6 @@ void raycaster::find_intersecting_walls(vector <ray_hit> &ray_hits, vector <wall
 	}
 }
 
-void raycaster::raycast_walls(vector <ray_hit> &ray_hits, vector <wall*> &walls,
-								double player_x, double player_y, double player_rot,
-								double strip_angle, int strip_idx){
-	double ray_angle = strip_angle + player_rot;
-	while(ray_angle < 0 || ray_angle >= TWO_PI){
-		ray_angle += (ray_angle < 0 ? TWO_PI : (ray_angle >= TWO_PI ? -TWO_PI : 0));
-	}
-
-	bool right = (ray_angle < 0.25 * TWO_PI && ray_angle >= 0) || // quad 1
-				(ray_angle > 0.75 * TWO_PI); // quad 4
-
-	double vx = (right ? grid_width * tile_size : 0);
-	double vy = player_y + (player_x - vx) * tan(ray_angle);
-
-	vector <ray_hit> new_ray_hits;
-	vector <ray_hit*> added_ray_hits;
-
-	find_intersecting_walls(new_ray_hits, walls, player_x, player_y, vx, vy);
-
-	for (int i = 0; i < (int) new_ray_hits.size(); ++i){
-		ray_hit &Ray_hit = new_ray_hits[i];
-		wall *wall = Ray_hit.Wall;
-
-		Ray_hit.wall_height = wall -> height;
-		Ray_hit.strip = strip_idx;
-		double dto = int(wall -> distance_to_origin(Ray_hit.x, Ray_hit.y) + 0.5);
-		Ray_hit.tile_x = (int) dto % this -> tile_size;
-		Ray_hit.horizontal = wall -> horizontal;
-		Ray_hit.wall_type = wall -> wall_type;
-		Ray_hit.ray_angle = ray_angle;
-	
-		if (Ray_hit.distance){
-			Ray_hit.correct_distance = Ray_hit.distance * cos(player_rot - ray_angle);
-
-			if (Ray_hit.correct_distance < 1){
-				continue;
-			}
-
-			added_ray_hits.push_back(&Ray_hit);
-		}
-	}
-
-	for (int i = 0; i < (int) added_ray_hits.size(); ++i){
-		ray_hits.push_back(*added_ray_hits[i]);
-	}
-}
-
 void raycaster::raycast_sprites(vector <ray_hit> &ray_hits, vector <vector <int>> &grids,
 								int grid_width, int grid_height, int tile_size,
 								double player_x, double player_y, double player_rot,
@@ -520,8 +372,6 @@ void raycaster::raycast_sprites(vector <ray_hit> &ray_hits, vector <vector <int>
 	bool right = (ray_angle < 0.25 * TWO_PI && ray_angle >= 0) || // quad 1
 				(ray_angle > 0.75 * TWO_PI); // quad 4
 	bool up = (ray_angle < TWO_PI * 0.5 && ray_angle >= 0); // quad 1 and 2
-
-	vector <int> &ground_grid = grids[0];
 
 	int current_tile_x = player_x / tile_size;
 	int current_tile_y = player_y / tile_size;

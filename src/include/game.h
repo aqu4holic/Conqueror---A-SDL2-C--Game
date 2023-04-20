@@ -15,12 +15,14 @@ using namespace std;
 const int TILE_SIZE = 128;
 
 const int TEXTURE_SIZE = 128; // length of wall textures in pixels
-const int MINIMAP_SCALE = 8;
+const int MINIMAP_SCALE = 8; // length of 1 block of minimap in pixels
 const int MINIMAP_Y = 0; // position of minimap from top of the screen
 const int DESIRED_FPS = 120;
 const int UPDATE_INTERVAL = 1000 / DESIRED_FPS;
 const double TWO_PI = 2 * M_PI;
 
+// https://opengameart.org/content/first-person-dungeon-crawl-art-pack
+// texture from this link
 enum sprite_type{
 	SPRITE_TYPE_DEFAULT,
 	SPRITE_TYPE_TREE_1,
@@ -35,7 +37,7 @@ enum sprite_type{
 	SPRITE_TYPE_PROJECTILE_SPLASH,
 };
 
-enum{
+enum menu{
 	MENU,
 	PLAY,
 	HELP,
@@ -109,7 +111,6 @@ public:
 	void update_player(double time_elapsed);
 	void update_projectiles(double time_elapsed);
 
-	double wall_screen_y(ray_hit &Ray_hit, double wall_height);
 	SDL_Rect strip_screen_rect(ray_hit &Ray_hit, double wall_height);
 	void draw_wall_strip(ray_hit &Ray_hit, surface_texture &img, double tex_x, double tex_y, int wall_screen_height);
 
@@ -168,5 +169,4 @@ private:
 
 	int ray_hits_count;
 	int doors[MAP_WIDTH * MAP_HEIGHT];
-	vector <wall*> walls;
 };

@@ -17,10 +17,6 @@ struct wall{
 	bool horizontal;
 	double height;
 
-	bool hidden;
-
-	// struct thick_wall *Thick_wall;
-
 	wall();
 	wall(double x1, double y1, double x2, double y2, int wall_type, double wall_height);
 
@@ -100,8 +96,6 @@ struct ray_hit{
 		Wall = 0;
 		wall_height = 0;
 	}
-
-	bool same_ray_hit(const ray_hit &Ray_hit2);
 };
 
 /*
@@ -151,16 +145,14 @@ struct raycaster{
 		these functions look for collisions with walls and sprites, not the render function
 		the collisions are stored in ray_hits
 	*/
-	void raycast(vector <ray_hit> &ray_hits, int player_x, int player_y, double player_rot, double strip_angle, int strip_idx,
-				vector <sprite> *sprites_to_look_for = nullptr);
+	void raycast(vector <ray_hit> &ray_hits, int player_x, int player_y, double player_rot, double strip_angle, int strip_idx);
 
 	static void raycast(vector <ray_hit> &ray_hits, vector <vector <int>> &grids, int grid_width, int grid_height, int tile_size,
 						int player_x, int player_y,
 						double player_rot, double strip_angle,
-						int strip_idx,
-						vector <sprite> *sprites_to_look_for = nullptr);
+						int strip_idx);
 
-	static bool needs_next_wall(vector <vector <int>> &grids, int tile_size, int grid_width, int x, int y);
+	static bool needs_next_wall(vector <vector <int>> &grids, int grid_width, int x, int y);
 
 	int safe_cell_at(int x, int y){
 		const int offset = x + y * grid_width;
@@ -181,10 +173,6 @@ struct raycaster{
 
 	static void find_intersecting_walls(vector <ray_hit> &ray_hits, vector <wall*> &walls,
 												double player_x, double player_y, double ray_end_x, double ray_end_y);
-	
-	void raycast_walls(vector <ray_hit> &ray_hits, vector <wall*> &walls,
-							double player_x, double player_y, double player_rot,
-							double strip_angle, int strip_idx);
 
 	static void raycast_sprites(vector <ray_hit> &ray_hits, vector <vector <int>> &grids,
 								int grid_width, int grid_height, int tile_size,
