@@ -1,4 +1,4 @@
-# Conqueror - A-SDL2-C-Game
+# Conqueror - A-SDL2-C++-Game
 
 ## Introduction
 
